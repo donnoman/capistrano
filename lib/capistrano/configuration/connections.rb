@@ -133,7 +133,7 @@ module Capistrano
           servers = find_servers_for_task(task, options)
 
           if servers.empty?
-            if ENV['HOSTFILTER']
+            if ENV['HOSTFILTER'] || skip_empty_servers(options)
               logger.info "skipping `#{task.fully_qualified_name}' because no servers matched"
               return
             else
@@ -147,7 +147,10 @@ module Capistrano
           end
         else
           servers = find_servers(options)
-          raise Capistrano::NoMatchingServersError, "no servers found to match #{options.inspect}" if servers.empty?
+          if servers.empty?
+            return if skip_empty_servers(options)
+            raise Capistrano::NoMatchingServersError, "no servers found to match #{options.inspect}"
+          end
         end
 
         servers = [servers.first] if options[:once]
@@ -183,6 +186,17 @@ module Capistrano
       end
 
       private
+
+        # Check if task is set to skip_empty_servers
+        # can set via:
+        # task :sample, :skip_empty_servers => true do ...
+        # OR for all tasks via default_run_options
+        # default_run_options[:skip_empty_servers] = true
+        def skip_empty_servers(options={})
+          return options[:skip_empty_servers] unless options[:skip_empty_servers].nil?
+          #fallback to task (which includes default_run_options)
+          return current_task.options[:skip_empty_servers] if current_task
+        end
 
         # We establish the connection by creating a thread in a new method--this
         # prevents problems with the thread's scope seeing the wrong 'server'

@@ -20,6 +20,10 @@ class ConfigurationConnectionsTest < Test::Unit::TestCase
       @values[key]
     end
 
+    def []=(key,value)
+      @values[key]=value
+    end
+
     def exists?(key)
       @values.key?(key)
     end
@@ -160,6 +164,11 @@ class ConfigurationConnectionsTest < Test::Unit::TestCase
     assert_raises(Capistrano::NoMatchingServersError) { @config.execute_on_servers(:a => :b, :c => :d) { |list| } }
   end
 
+  def test_execute_on_servers_without_current_task_should_not_raise_error_if_option_skip_empty_servers_true
+    @config.expects(:find_servers).with(:a => :b, :c => :d, :skip_empty_servers => true).returns([])
+    assert_nothing_raised { @config.execute_on_servers(:a => :b, :c => :d, :skip_empty_servers => true) { |list| } }
+  end
+
   def test_execute_on_servers_should_raise_an_error_if_the_current_task_has_no_matching_servers_by_default
     @config.current_task = mock_task
     @config.expects(:find_servers_for_task).with(@config.current_task, {}).returns([])
@@ -170,6 +179,22 @@ class ConfigurationConnectionsTest < Test::Unit::TestCase
     end
   end
   
+ def test_execute_on_servers_should_raise_an_error_if_the_current_task_has_no_matching_servers_if_task_option_skip_empty_servers_false
+    @config.current_task = mock_task(:skip_empty_servers => false)
+    @config.expects(:find_servers_for_task).with(@config.current_task, {}).returns([])
+    assert_raises(Capistrano::NoMatchingServersError) do
+      @config.execute_on_servers do
+        flunk "should not get here"
+      end
+    end
+  end
+
+  def test_execute_on_servers_should_not_raise_an_error_if_the_current_task_has_no_matching_servers_if_task_option_skip_empty_servers_true
+    @config.current_task = mock_task(:skip_empty_servers => true)
+    @config.expects(:find_servers_for_task).with(@config.current_task, {}).returns([])
+    assert_nothing_raised { @config.execute_on_servers { |list| } }
+  end
+
   def test_execute_on_servers_should_determine_server_list_from_active_task
     assert @config.sessions.empty?
     @config.current_task = mock_task
